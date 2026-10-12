@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f6b55">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Caderneta do Mercado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<style>
+/* Layout: one-column phone app — sticky total bar, tabs at bottom, full-screen live scanner, sheets slide up */
+:root{
+  --bg:#eef0ea; --paper:#fbfcf8; --ink:#1d2420; --muted:#5f6b63; --line:#d5dbd2;
+  --accent:#0f6b55; --accent-ink:#ffffff; --accent-soft:#d9ece5;
+  --ok:#1f7a3f; --ok-soft:#dcefe2; --warn:#a4600a; --warn-soft:#f7e8cf; --bad:#b3261e; --bad-soft:#f6dcd9;
+  --shadow:0 10px 30px rgba(20,40,30,.14);
+  --f-display:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;
+  --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121614; --paper:#1b211e; --ink:#e7ece8; --muted:#9aa69f; --line:#2d3631;
+  --accent:#48c29d; --accent-ink:#06261d; --accent-soft:#183a30;
+  --ok:#6ad08e; --ok-soft:#173523; --warn:#f0b257; --warn-soft:#3a2b14; --bad:#f08a80; --bad-soft:#3d1c19;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{min-height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);padding:0 16px;padding-block:env(safe-area-inset-top,0px) calc(96px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+button,label.btn{font:inherit;cursor:pointer;border-radius:12px;padding:12px 14px;background:var(--paper);color:var(--ink);border:1px solid var(--line);font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.primary{background:var(--accent)!important;color:var(--accent-ink)!important;border-color:transparent!important}
+.ghost{background:transparent!important;border-color:transparent!important;color:var(--accent)!important;padding:8px 10px!important}
+.danger{color:var(--bad)!important;border-color:var(--bad)!important}
+button:disabled{opacity:.5;cursor:default}
+input{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 0;min-width:0}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);padding-block:14px 10px;margin:0 -16px;padding-inline:16px;border-bottom:1px solid var(--line)}
+header.top .in{max-width:560px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:22px;line-height:1}
+.brand small{display:block;font:500 12px var(--f-body);color:var(--muted);margin-top:4px}
+.totalbox{text-align:right}
+.totalbox .v{font:700 24px var(--f-num);line-height:1.1}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--paper);border-top:1px solid var(--line);padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:8px}
+nav.tabs button{flex:0 1 180px;border:0;background:transparent;color:var(--muted);padding:10px}
+nav.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions .big{grid-column:1/-1;padding:18px;font-size:17px}
+.actions .big svg{width:26px;height:26px}
+.receipt{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:14px 14px 18px;font-family:var(--f-num);font-size:13px;position:relative}
+.receipt::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:8px;background:linear-gradient(-45deg,transparent 5px,var(--paper) 0) 0 0/10px 8px repeat-x,linear-gradient(45deg,transparent 5px,var(--paper) 0) 0 0/10px 8px repeat-x}
+.receipt .hd{text-align:center;border-bottom:1px dashed var(--line);padding-bottom:8px;margin-bottom:6px}
+.receipt .hd b{font-size:14px;letter-spacing:.06em}
+.it{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.it .n{font-family:var(--f-body);font-size:14px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.it .s{text-align:right;font-weight:700}
+.it .d{color:var(--muted);font-size:12px}
+.it .q{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.it .q button{padding:2px 10px;border-radius:8px;font-family:var(--f-num)}
+.tot{display:flex;justify-content:space-between;padding-top:10px;font-weight:700;font-size:16px}
+.empty{color:var(--muted);text-align:center;padding:18px 6px;font-family:var(--f-body)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.chip{flex:0 0 auto;padding:7px 12px;border-radius:999px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font:700 11px var(--f-body);letter-spacing:.04em;text-transform:uppercase}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.mute{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat .v{font:700 18px var(--f-num)}
+.stat.main{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.stat.main .label{color:inherit;opacity:.8}
+.stat.main .v{font-size:28px}
+.hist{display:flex;flex-direction:column;gap:8px}
+.hrow{display:grid!important;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;text-align:left!important;width:100%;padding:12px}
+.hrow .dt{font:700 13px var(--f-num);text-align:center;line-height:1.1;background:var(--bg);border-radius:10px;padding:8px 6px;min-width:48px}
+.hrow .dt small{display:block;font-weight:500;color:var(--muted);font-size:10px;text-transform:uppercase}
+.hrow .mid{min-width:0}
+.hrow .mid b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hrow .mid span{color:var(--muted);font-size:13px;font-weight:500}
+.hrow .v{font:700 15px var(--f-num);text-align:right}
+.scrim{position:fixed;inset:0;background:rgba(10,20,15,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--paper);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet .sh{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.seg.two{grid-template-columns:1fr 1fr}
+.seg button{padding:10px 4px;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.note{font-size:13px;color:var(--muted)}
+.msg{padding:10px 12px;border-radius:10px;font-size:14px}
+.msg.ok{background:var(--ok-soft);color:var(--ok)}
+.msg.warn{background:var(--warn-soft);color:var(--warn)}
+.msg.bad{background:var(--bad-soft);color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:999px;font-weight:600;z-index:60;max-width:90vw;text-align:center}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px;z-index:2}
+
+/* live scanner */
+.scanner{position:fixed;inset:0;z-index:40;background:#000;display:flex;flex-direction:column}
+.scanner video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.scanner .frame{position:absolute;left:8%;right:8%;top:32%;height:22%;border-radius:14px;box-shadow:0 0 0 100vmax rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.9)}
+.scanner .frame::after{content:"";position:absolute;left:6%;right:6%;top:50%;height:2px;background:#ff5a4f;box-shadow:0 0 12px #ff5a4f;animation:las 1.6s ease-in-out infinite}
+@keyframes las{0%,100%{transform:translateY(-28px)}50%{transform:translateY(28px)}}
+@media (prefers-reduced-motion:reduce){.scanner .frame::after{animation:none}}
+.scanner .frame.hit{border-color:#5be39b}
+.scanner .bar{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 14px;color:#fff}
+.scanner .bar button{background:rgba(0,0,0,.55);color:#fff;border-color:rgba(255,255,255,.3)}
+.scanner .hint{position:absolute;left:16px;right:16px;top:58%;z-index:2;text-align:center;color:#fff;font-weight:600;text-shadow:0 1px 4px #000}
+.scanner .foot{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.scanner .last{color:#fff;font-size:14px;min-height:20px;text-align:center}
+.scanner .last b{font-family:var(--f-num)}
+.scanner .foot .row button{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <div class="brand">Caderneta<br>do Mercado<small id="status"></small></div>
+  <div class="totalbox" id="topTotal" hidden><div class="label">Compra atual</div><div class="v num" id="topTotalV">R$ 0,00</div></div>
+</div></header>
+
+<main class="wrap" style="padding-top:16px">
+  <section id="tabCompra"></section>
+  <section id="tabHist" hidden></section>
+</main>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" id="tbCompra" aria-selected="true">Compra</button>
+  <button role="tab" id="tbHist" aria-selected="false">Histórico</button>
+</nav>
+
+<div id="scanner" class="scanner" hidden>
+  <video id="video" playsinline muted></video>
+  <div class="bar"><button id="scFechar">Fechar</button><b id="scTotal" class="num"></b><button id="scLuz" hidden>Lanterna</button></div>
+  <div class="frame" id="scFrame"></div>
+  <div class="hint" id="scHint">Aponte para o código de barras</div>
+  <div class="foot">
+    <div class="last" id="scLast"></div>
+    <div class="row"><button id="scDigitar">Digitar código</button><button id="scSemCod">Item sem código</button></div>
+  </div>
+</div>
+
+<div id="sheetRoot"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const brl = v => (Number(v)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const parseNum = s => { if (typeof s==="number") return s; s=String(s||"").trim().replace(/\s|R\$/g,""); if (s.includes(",")) s=s.replace(/\./g,"").replace(",","."); const n=parseFloat(s); return isFinite(n)?n:0; };
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const round2 = n => Math.round((n+Number.EPSILON)*100)/100;
+const PAG = {dinheiro:"Dinheiro",debito:"Cartão débito",credito:"Cartão crédito",pix:"Pix"};
+const MESES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const ICON_SCAN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>';
+const KEY="caderneta-mercado-v1";
+
+/* ---------- storage (no próprio celular) ---------- */
+let estado = { compras:[], catalogo:{} };
+function carregar(){ try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&Array.isArray(s.compras)) estado={compras:s.compras, catalogo:s.catalogo||{}}; }catch(e){} }
+function gravar(){ try{ localStorage.setItem(KEY, JSON.stringify(estado)); }catch(e){ toast("Não consegui salvar no celular. Faça um backup."); } }
+carregar();
+try{ navigator.storage?.persist?.(); }catch(e){}
+
+let atualId = (estado.compras.filter(c=>c.status==="aberta").sort((a,b)=>(b.criado||0)-(a.criado||0))[0]||{}).id || null;
+let filtroMes = null;
+
+function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>el.hidden=true,2400); }
+function todayISO(){ const d=new Date(); const z=d.getTimezoneOffset()*60000; return new Date(d-z).toISOString().slice(0,10); }
+function fmtData(iso){ if(!iso) return ""; const [y,m,d]=iso.slice(0,10).split("-"); return `${d}/${m}/${y}`; }
+function uidGen(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function totalDe(c){ return round2((c.itens||[]).reduce((s,i)=>s+parseNum(i.qtd)*parseNum(i.preco),0)); }
+function atual(){ return estado.compras.find(c=>c.id===atualId) || null; }
+function fmtQtd(i){ return i.unidade==="kg" ? parseNum(i.qtd).toLocaleString("pt-BR",{maximumFractionDigits:3})+" kg" : parseNum(i.qtd)+" un"; }
+function salvar(){ gravar(); render(); }
+
+/* ---------- render ---------- */
+function render(){ renderCompra(); renderHist(); renderTop(); }
+function renderTop(){
+  const c=atual(); $("#topTotal").hidden=!c; if(c) $("#topTotalV").textContent=brl(totalDe(c));
+  const n=estado.compras.filter(x=>x.status==="finalizada").length;
+  $("#status").textContent = n+(n===1?" compra registrada":" compras registradas");
+}
+
+function renderCompra(){
+  const el=$("#tabCompra"); const c=atual();
+  if (!c){
+    const sugest=[...new Set(estado.compras.filter(x=>x.status==="finalizada").map(x=>x.mercado).filter(Boolean))].slice(0,4);
+    el.innerHTML = `
+      <div class="card">
+        <h2 style="font-size:26px">Nova compra</h2>
+        <p class="note" style="margin:0">Passe a câmera nos códigos de barras enquanto coloca no carrinho. No caixa, escolha como pagou e confira a notinha.</p>
+        <div class="field"><label class="label" for="inMercado">Mercado</label><input id="inMercado" placeholder="Ex.: Condor Campo Largo" autocomplete="off"></div>
+        ${sugest.length?`<div class="chips">${sugest.map(m=>`<button class="chip" data-merc="${esc(m)}">${esc(m)}</button>`).join("")}</div>`:""}
+        <div class="field"><label class="label" for="inData">Data</label><input id="inData" type="date" value="${todayISO()}"></div>
+        <button class="primary" id="btnComecar" style="padding:16px;font-size:16px">Começar a compra</button>
+      </div>`;
+    el.querySelectorAll("[data-merc]").forEach(b=>b.onclick=()=>{ $("#inMercado").value=b.dataset.merc; });
+    $("#btnComecar").onclick=()=>{
+      const nova={id:uidGen(), status:"aberta", mercado:$("#inMercado").value.trim()||"Mercado", data:$("#inData").value||todayISO(), criado:Date.now(), itens:[], pagamento:null, conferencia:null};
+      estado.compras.push(nova); atualId=nova.id; salvar(); abrirScanner();
+    };
+    return;
+  }
+  const itens=c.itens||[];
+  el.innerHTML = `
+    <div class="actions">
+      <button class="primary big" id="btnScan">${ICON_SCAN} Escanear produtos</button>
+      <button id="btnDigitar">Digitar código</button>
+      <button id="btnSemCod">Item sem código</button>
+    </div>
+    <div class="receipt">
+      <div class="hd"><b>${esc(c.mercado).toUpperCase()}</b><div class="d" style="color:var(--muted)">${fmtData(c.data)} · ${itens.length} ${itens.length===1?"item":"itens"}</div></div>
+      ${itens.length? itens.map((i,k)=>`
+        <div class="it">
+          <div class="n">${esc(i.nome)}</div>
+          <div class="s">${brl(parseNum(i.qtd)*parseNum(i.preco))}</div>
+          <div class="d">${i.codigo?esc(i.codigo)+" · ":""}${fmtQtd(i)} × ${brl(i.preco)}</div>
+          <div class="q"><button data-menos="${k}" aria-label="Diminuir">−</button><button data-mais="${k}" aria-label="Aumentar">+</button><button data-edit="${k}" aria-label="Editar">✎</button></div>
+        </div>`).join("") : `<div class="empty">Nenhum produto ainda. Toque em <b>Escanear produtos</b> e passe a câmera no código de barras.</div>`}
+      <div class="tot"><span>TOTAL</span><span class="num">${brl(totalDe(c))}</span></div>
+    </div>
+    <button class="primary" id="btnFinal" style="padding:16px;font-size:16px" ${itens.length?"":"disabled"}>Finalizar e pagar</button>
+    <div class="row"><button class="ghost" id="btnEditCab">Mudar mercado ou data</button><button class="ghost" id="btnCancelar" style="color:var(--bad)!important">Descartar compra</button></div>`;
+  $("#btnScan").onclick=abrirScanner;
+  $("#btnDigitar").onclick=()=>sheetCodigo();
+  $("#btnSemCod").onclick=()=>sheetItem({codigo:""});
+  el.querySelectorAll("[data-mais]").forEach(b=>b.onclick=()=>mudaQtd(+b.dataset.mais, 1));
+  el.querySelectorAll("[data-menos]").forEach(b=>b.onclick=()=>mudaQtd(+b.dataset.menos, -1));
+  el.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>sheetItem({...itens[+b.dataset.edit]}, +b.dataset.edit));
+  $("#btnFinal").onclick=()=>sheetPagamento(c);
+  $("#btnEditCab").onclick=()=>sheetCabecalho(c);
+  $("#btnCancelar").onclick=()=>confirmar("Descartar esta compra?","Os itens registrados serão apagados.","Descartar",()=>{ estado.compras=estado.compras.filter(x=>x.id!==c.id); atualId=null; salvar(); });
+}
+function mudaQtd(k, d){
+  const c=atual(); const i=c.itens[k]; if(!i) return;
+  const nq = round2(parseNum(i.qtd)+d*(i.unidade==="kg"?0.1:1));
+  if (nq<=0){ confirmar("Remover "+i.nome+"?","","Remover",()=>{ c.itens.splice(k,1); salvar(); }); return; }
+  i.qtd=nq; salvar();
+}
+
+function renderHist(){
+  const el=$("#tabHist");
+  const fin = estado.compras.filter(c=>c.status==="finalizada").sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criado||0)-(a.criado||0));
+  const meses=[...new Set(fin.map(c=>(c.data||"").slice(0,7)))].filter(Boolean).sort().reverse();
+  if (filtroMes && filtroMes!=="tudo" && !meses.includes(filtroMes)) filtroMes=null;
+  if (!filtroMes && meses.length) filtroMes=meses[0];
+  const lista = filtroMes==="tudo" ? fin : fin.filter(c=>(c.data||"").startsWith(filtroMes||""));
+  const tot = round2(lista.reduce((s,c)=>s+totalDe(c),0));
+  const por = {}; lista.forEach(c=>{ const f=c.pagamento?.forma||"outro"; por[f]=round2((por[f]||0)+totalDe(c)); });
+  const nomeMes = m => { if(m==="tudo") return "Tudo"; const [y,mm]=m.split("-"); return MESES[+mm-1]+"/"+y.slice(2); };
+  const backup = `<div class="card"><h3 style="font-size:17px">Backup</h3>
+      <p class="note" style="margin:0">As compras ficam guardadas neste celular, neste navegador. Se limpar os dados do Chrome, elas somem. Salve um backup de vez em quando.</p>
+      <div class="row"><button id="bkSalvar">Salvar backup</button><label class="btn filebtn">Restaurar backup<input type="file" id="bkIn" accept="application/json,.json"></label></div></div>`;
+  el.innerHTML = (!fin.length ? `
+    <div class="card"><h2>Histórico</h2><div class="empty">Suas compras finalizadas aparecem aqui, com data, mercado, forma de pagamento e se a notinha bateu.</div></div>` : `
+    <div class="chips">${[...meses,"tudo"].map(m=>`<button class="chip" data-mes="${m}" aria-pressed="${m===filtroMes}">${nomeMes(m)}</button>`).join("")}</div>
+    <div class="stats">
+      <div class="stat main"><div class="label">Total gasto · ${lista.length} ${lista.length===1?"compra":"compras"}</div><div class="v">${brl(tot)}</div></div>
+      ${["dinheiro","debito","credito","pix"].filter(f=>por[f]).map(f=>`<div class="stat"><div class="label">${PAG[f]}</div><div class="v">${brl(por[f])}</div></div>`).join("")}
+    </div>
+    <div class="hist">${lista.map(c=>{ const [y,m,d]=(c.data||"----").split("-"); const cf=c.conferencia;
+      return `<button class="hrow" data-ver="${c.id}">
+        <div class="dt">${d||"--"}<small>${m?MESES[+m-1]:""}</small></div>
+        <div class="mid"><b>${esc(c.mercado)}</b><span>${PAG[c.pagamento?.forma]||"—"} · ${(c.itens||[]).length} itens</span>
+          <div style="margin-top:4px">${cf?(cf.bateu?'<span class="pill ok">Nota confere</span>':'<span class="pill bad">Divergência</span>'):'<span class="pill mute">Sem conferência</span>'}</div></div>
+        <div class="v">${brl(totalDe(c))}</div></button>`; }).join("")}</div>`) + backup;
+  el.querySelectorAll("[data-mes]").forEach(b=>b.onclick=()=>{ filtroMes=b.dataset.mes; renderHist(); });
+  el.querySelectorAll("[data-ver]").forEach(b=>b.onclick=()=>sheetDetalhe(estado.compras.find(c=>c.id===b.dataset.ver)));
+  $("#bkSalvar").onclick=salvarBackup;
+  $("#bkIn").onchange=e=>restaurarBackup(e.target.files?.[0]);
+}
+
+function salvarBackup(){
+  const blob=new Blob([JSON.stringify(estado,null,1)],{type:"application/json"});
+  const nome="caderneta-backup-"+todayISO()+".json";
+  const f=new File([blob],nome,{type:"application/json"});
+  if (navigator.canShare?.({files:[f]})) { navigator.share({files:[f], title:"Backup da Caderneta"}).catch(()=>{}); return; }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nome; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+}
+async function restaurarBackup(file){
+  if(!file) return;
+  try{
+    const d=JSON.parse(await file.text()); if(!Array.isArray(d.compras)) throw 0;
+    confirmar("Restaurar este backup?","Compras com o mesmo registro serão substituídas pelas do backup.","Restaurar",()=>{
+      const map=new Map(estado.compras.map(c=>[c.id,c])); d.compras.forEach(c=>map.set(c.id,c));
+      estado.compras=[...map.values()]; estado.catalogo={...estado.catalogo,...(d.catalogo||{})}; salvar(); toast("Backup restaurado");
+    });
+  }catch(e){ toast("Esse arquivo não é um backup da Caderneta."); }
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html, onMount){
+  const root=$("#sheetRoot");
+  root.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeSheet(); });
+  root.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeSheet);
+  onMount && onMount(root.querySelector(".sheet"));
+}
+let aoFecharSheet=null;
+function closeSheet(){ $("#sheetRoot").innerHTML=""; const f=aoFecharSheet; aoFecharSheet=null; f&&f(); }
+const shHead = t => `<div class="sh"><h3 style="font-size:20px">${t}</h3><button class="ghost" data-close>Fechar</button></div>`;
+
+function confirmar(titulo, texto, acao, fn){
+  openSheet(`<h3 style="font-size:20px">${esc(titulo)}</h3>${texto?`<p class="note" style="margin:0">${esc(texto)}</p>`:""}
+    <div class="row"><button data-close>Voltar</button><button id="cfOk" style="background:var(--bad);color:#fff;border-color:transparent">${esc(acao)}</button></div>`,
+    ()=>{ $("#cfOk").onclick=()=>{ aoFecharSheet=null; $("#sheetRoot").innerHTML=""; fn(); }; });
+}
+
+function sheetCabecalho(c){
+  openSheet(`${shHead("Dados da compra")}
+    <div class="field"><label class="label" for="cbM">Mercado</label><input id="cbM" value="${esc(c.mercado)}"></div>
+    <div class="field"><label class="label" for="cbD">Data</label><input id="cbD" type="date" value="${esc(c.data)}"></div>
+    <button class="primary" id="cbOk">Salvar</button>`, ()=>{
+      $("#cbOk").onclick=()=>{ c.mercado=$("#cbM").value.trim()||c.mercado; c.data=$("#cbD").value||c.data; salvar(); closeSheet(); };
+  });
+}
+
+function sheetCodigo(){
+  openSheet(`${shHead("Digitar código")}
+    <div class="field"><label class="label" for="cdIn">Código de barras</label><input id="cdIn" inputmode="numeric" placeholder="7891000100103" autocomplete="off"></div>
+    <button class="primary" id="cdOk">Continuar</button>`, ()=>{
+      $("#cdIn").focus();
+      const go=()=>{ const v=$("#cdIn").value.replace(/\D/g,""); if(!v){ toast("Digite os números do código."); return; } aoFecharSheet=null; $("#sheetRoot").innerHTML=""; itemPorCodigo(v); };
+      $("#cdOk").onclick=go; $("#cdIn").onkeydown=e=>{ if(e.key==="Enter") go(); };
+  });
+}
+
+/* returns true when added silently (known product) */
+function itemPorCodigo(codigo){
+  const c=atual(); if(!c) return false;
+  const k=c.itens.findIndex(i=>i.codigo===codigo);
+  if (k>=0 && c.itens[k].unidade!=="kg"){ c.itens[k].qtd=parseNum(c.itens[k].qtd)+1; salvar(); return {nome:c.itens[k].nome, qtd:c.itens[k].qtd, preco:c.itens[k].preco}; }
+  const cat=estado.catalogo[codigo];
+  if (cat && cat.unidade!=="kg" && k<0 && cat.nome && cat.preco>0 && scannerAberto){
+    c.itens.push({codigo, nome:cat.nome, preco:cat.preco, qtd:1, unidade:"un"}); salvar();
+    return {nome:cat.nome, qtd:1, preco:cat.preco, conhecido:true};
+  }
+  sheetItem({codigo, nome:cat?.nome||"", preco:cat?.preco??"", unidade:cat?.unidade||"un", qtd:1}, -1, !cat);
+  return false;
+}
+
+function sheetItem(item, idx=-1, novo=false){
+  const editando = idx>=0; const un = item.unidade||"un";
+  openSheet(`${shHead(editando?"Editar item":"Adicionar item")}
+    ${item.codigo?`<div class="note num">Código ${esc(item.codigo)} ${novo?'· <span class="pill warn">produto novo</span>':(editando?"":'· <span class="pill ok">já conhecido</span>')}</div>`:""}
+    <div class="field"><label class="label" for="itNome">Produto</label><input id="itNome" value="${esc(item.nome||"")}" placeholder="Ex.: Arroz Tio João 5kg" autocomplete="off"></div>
+    <div class="seg two" role="group" aria-label="Unidade"><button data-un="un" aria-pressed="${un==="un"}">Unidade</button><button data-un="kg" aria-pressed="${un==="kg"}">Peso (kg)</button></div>
+    <div class="row">
+      <div class="field"><label class="label" for="itPreco" id="lbPreco">${un==="kg"?"Preço do kg":"Preço unitário"}</label><input id="itPreco" inputmode="decimal" value="${item.preco!==""&&item.preco!=null?String(item.preco).replace(".",","):""}" placeholder="0,00"></div>
+      <div class="field"><label class="label" for="itQtd" id="lbQtd">${un==="kg"?"Peso (kg)":"Quantidade"}</label><input id="itQtd" inputmode="decimal" value="${String(item.qtd??1).replace(".",",")}"></div>
+    </div>
+    <div class="note" id="itSub"></div>
+    <button class="primary" id="itOk" style="padding:14px">${editando?"Salvar":"Adicionar à compra"}</button>
+    ${editando?`<button class="danger" id="itDel">Remover item</button>`:""}`, ()=>{
+      let unidade=un;
+      const sub=()=>{ $("#itSub").textContent="Subtotal: "+brl(parseNum($("#itPreco").value)*parseNum($("#itQtd").value)); };
+      $("#itPreco").oninput=sub; $("#itQtd").oninput=sub; sub();
+      document.querySelectorAll("[data-un]").forEach(b=>b.onclick=()=>{ unidade=b.dataset.un;
+        document.querySelectorAll("[data-un]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+        $("#lbPreco").textContent=unidade==="kg"?"Preço do kg":"Preço unitário"; $("#lbQtd").textContent=unidade==="kg"?"Peso (kg)":"Quantidade"; });
+      (item.nome? $("#itPreco") : $("#itNome")).focus();
+      $("#itOk").onclick=()=>{
+        const nome=$("#itNome").value.trim(); const preco=round2(parseNum($("#itPreco").value)); const qtd=parseNum($("#itQtd").value);
+        if(!nome){ toast("Dê um nome ao produto."); return; }
+        if(!(preco>0)){ toast("Informe o preço."); return; }
+        if(!(qtd>0)){ toast("Informe a quantidade."); return; }
+        const c=atual(); const ni={codigo:item.codigo||"", nome, preco, qtd, unidade};
+        if (editando) c.itens[idx]=ni; else c.itens.push(ni);
+        if (ni.codigo) estado.catalogo[ni.codigo]={nome,preco,unidade};
+        salvar(); closeSheet(); if(!editando){ toast(nome+" adicionado"); if(scannerAberto) mostrarUltimo(nome, qtd, preco); }
+      };
+      if (editando) $("#itDel").onclick=()=>{ const c=atual(); c.itens.splice(idx,1); salvar(); closeSheet(); };
+  });
+  if (scannerAberto){ pausarLeitura(true); aoFecharSheet=()=>pausarLeitura(false); }
+}
+
+function sheetPagamento(c){
+  const total=totalDe(c); let forma=c.pagamento?.forma||"dinheiro";
+  openSheet(`${shHead("Pagamento")}
+    <div style="text-align:center"><div class="label">Total registrado</div><div class="num" style="font-size:34px;font-weight:700">${brl(total)}</div></div>
+    <div class="seg" role="group" aria-label="Forma de pagamento">${Object.entries(PAG).map(([k,v])=>`<button data-fp="${k}" aria-pressed="${k===forma}">${v.replace("Cartão ","")}</button>`).join("")}</div>
+    <div class="field" id="boxPago"><label class="label" for="pgValor">Valor entregue</label><input id="pgValor" inputmode="decimal" placeholder="${brl(total)}"><div class="note" id="pgTroco"></div></div>
+    <div class="field" id="boxParc" hidden><label class="label" for="pgParc">Parcelas</label><input id="pgParc" inputmode="numeric" value="1"></div>
+    <button class="primary" id="pgOk" style="padding:14px">Finalizar compra</button>`, ()=>{
+      const upd=()=>{ $("#boxPago").hidden=forma!=="dinheiro"; $("#boxParc").hidden=forma!=="credito";
+        document.querySelectorAll("[data-fp]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.fp===forma));
+        const v=parseNum($("#pgValor").value); $("#pgTroco").textContent = v? (v>=total? "Troco: "+brl(v-total) : "Faltam "+brl(total-v)) : ""; };
+      document.querySelectorAll("[data-fp]").forEach(b=>b.onclick=()=>{ forma=b.dataset.fp; upd(); });
+      $("#pgValor").oninput=upd; upd();
+      $("#pgOk").onclick=()=>{
+        const pago=parseNum($("#pgValor").value);
+        c.pagamento={forma, total, ...(forma==="dinheiro"&&pago?{entregue:round2(pago),troco:round2(Math.max(0,pago-total))}:{}), ...(forma==="credito"?{parcelas:Math.max(1,parseInt($("#pgParc").value)||1)}:{})};
+        c.status="finalizada"; c.finalizado=Date.now(); atualId=null; salvar();
+        aoFecharSheet=null; $("#sheetRoot").innerHTML=""; sheetDetalhe(c, true);
+      };
+  });
+}
+
+function textoConferencia(c){
+  const linhas=(c.itens||[]).map((i,k)=>`${k+1}. ${i.nome} | cód ${i.codigo||"—"} | ${fmtQtd(i)} x ${brl(i.preco)} = ${brl(parseNum(i.qtd)*parseNum(i.preco))}`);
+  return `Confira esta notinha de supermercado com a lista que registrei no app. Compare item por item (código, preço e quantidade), considere descontos impressos e diga se o total bateu e o que está diferente.
+
+Mercado: ${c.mercado}
+Data: ${fmtData(c.data)}
+Pagamento: ${PAG[c.pagamento?.forma]||"—"}
+
+Itens registrados:
+${linhas.join("\n")}
+
+Total no app: ${brl(totalDe(c))}`;
+}
+
+function sheetDetalhe(c, recem=false){
+  if(!c) return; const p=c.pagamento||{}; const cf=c.conferencia;
+  openSheet(`${shHead(esc(c.mercado))}
+    ${recem?`<div class="msg ok">Compra finalizada e salva.</div>`:""}
+    <div class="row" style="align-items:flex-end">
+      <div><div class="label">Data</div><div class="num">${fmtData(c.data)}</div></div>
+      <div><div class="label">Pagamento</div><div>${PAG[p.forma]||"—"}${p.parcelas>1?" · "+p.parcelas+"x":""}</div></div>
+      <div style="text-align:right"><div class="label">Total</div><div class="num" style="font-weight:700;font-size:18px">${brl(totalDe(c))}</div></div>
+    </div>
+    ${p.entregue?`<div class="note">Entregue ${brl(p.entregue)} · troco ${brl(p.troco)}</div>`:""}
+    <div class="card" style="gap:10px">
+      <h3 style="font-size:17px">Conferir a notinha</h3>
+      <p class="note" style="margin:0">Fotografe a notinha. O celular abre o menu de compartilhar: escolha o <b>Claude</b> e envie. A foto vai junto com a lista desta compra e o Claude diz se bateu.</p>
+      <label class="btn primary filebtn" style="padding:14px">Fotografar a notinha<input type="file" id="notaIn" accept="image/*" capture="environment"></label>
+      <button id="btnCopiar">Só copiar a lista</button>
+      <div class="label" style="margin-top:4px">Resultado</div>
+      <div class="seg two"><button data-cf="ok" aria-pressed="${cf?.bateu===true}">Bateu</button><button data-cf="bad" aria-pressed="${cf?.bateu===false}">Não bateu</button></div>
+      <input id="cfObs" placeholder="Anotação (ex.: cobraram 2 leites)" value="${esc(cf?.obs||"")}">
+    </div>
+    <details><summary class="label" style="cursor:pointer">Itens registrados (${(c.itens||[]).length})</summary>
+      <div class="receipt" style="margin-top:10px">${(c.itens||[]).map(i=>`<div class="it"><div class="n">${esc(i.nome)}</div><div class="s">${brl(parseNum(i.qtd)*parseNum(i.preco))}</div><div class="d" style="grid-column:1/-1">${i.codigo?esc(i.codigo)+" · ":""}${fmtQtd(i)} × ${brl(i.preco)}</div></div>`).join("")}
+      <div class="tot"><span>TOTAL</span><span>${brl(totalDe(c))}</span></div></div></details>
+    <div class="row"><button id="btnReabrir">Reabrir para editar</button><button class="danger" id="btnExcluir">Excluir</button></div>`, ()=>{
+      const marcar=(bateu)=>{ c.conferencia={bateu, obs:$("#cfObs").value.trim(), quando:Date.now()}; gravar(); render();
+        document.querySelectorAll("[data-cf]").forEach(b=>b.setAttribute("aria-pressed",(b.dataset.cf==="ok")===bateu)); toast(bateu?"Marcada como conferida":"Divergência anotada"); };
+      document.querySelectorAll("[data-cf]").forEach(b=>b.onclick=()=>marcar(b.dataset.cf==="ok"));
+      $("#cfObs").onchange=()=>{ if(c.conferencia){ c.conferencia.obs=$("#cfObs").value.trim(); gravar(); } };
+      const ni=$("#notaIn"); ni.onclick=()=>{ ni.value=""; };
+      ni.onchange=async()=>{
+        const f=ni.files?.[0]; if(!f) return; const texto=textoConferencia(c);
+        try{
+          const img=await reduzir(f);
+          const arq=new File([img],"notinha-"+(c.data||todayISO())+".jpg",{type:"image/jpeg"});
+          if (navigator.canShare?.({files:[arq], text:texto})) { await navigator.share({files:[arq], text:texto}); return; }
+        }catch(e){ if(e?.name==="AbortError") return; }
+        await copiar(texto); toast("Lista copiada. Abra o Claude, cole e anexe a foto.");
+      };
+      $("#btnCopiar").onclick=async()=>{ await copiar(textoConferencia(c)); toast("Lista copiada"); };
+      $("#btnReabrir").onclick=()=>{ if(atual()&&atual().id!==c.id){ toast("Finalize a compra aberta primeiro."); return; } c.status="aberta"; atualId=c.id; salvar(); closeSheet(); trocaTab("compra"); };
+      $("#btnExcluir").onclick=()=>confirmar("Excluir esta compra?","Ela sai do histórico e dos totais.","Excluir",()=>{ estado.compras=estado.compras.filter(x=>x.id!==c.id); salvar(); });
+  });
+}
+async function copiar(t){ try{ await navigator.clipboard.writeText(t); }catch(e){ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand("copy");}catch(_){} ta.remove(); } }
+async function reduzir(file, max=2200){
+  const url=URL.createObjectURL(file);
+  try{ const img=await new Promise((r,j)=>{const i=new Image(); i.onload=()=>r(i); i.onerror=j; i.src=url;});
+    const s=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)); const cv=document.createElement("canvas");
+    cv.width=Math.round(img.naturalWidth*s); cv.height=Math.round(img.naturalHeight*s); cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+    return await new Promise(r=>cv.toBlob(r,"image/jpeg",0.85)); } finally{ URL.revokeObjectURL(url); }
+}
+
+/* ---------- live scanner ---------- */
+let scannerAberto=false, stream=null, detector=null, zx=null, loopT=null, pausado=false, ultimoCod="", ultimoT=0, leituras={};
+const video=$("#video");
+function eanValido(c){
+  if(!/^\d+$/.test(c)) return true;
+  if(![8,12,13,14].includes(c.length)) return true;
+  const d=c.split("").map(Number); const chk=d.pop(); let s=0;
+  d.reverse().forEach((n,i)=>{ s+= n*(i%2===0?3:1); });
+  return (10-(s%10))%10===chk;
+}
+async function abrirScanner(){
+  if(!atual()){ toast("Comece uma compra primeiro."); return; }
+  if(!navigator.mediaDevices?.getUserMedia){ toast("Este navegador não libera a câmera. Use o Chrome."); return; }
+  $("#scanner").hidden=false; scannerAberto=true; pausado=false; $("#scLast").textContent=""; atualizarScTotal();
+  $("#scHint").textContent="Abrindo a câmera…";
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+  }catch(e){
+    fecharScanner();
+    toast(e?.name==="NotAllowedError"?"Libere a câmera para este site nas configurações do Chrome.":"Não consegui abrir a câmera.");
+    return;
+  }
+  video.srcObject=stream; await video.play().catch(()=>{});
+  const track=stream.getVideoTracks()[0]; const caps=track.getCapabilities?.()||{};
+  $("#scLuz").hidden=!caps.torch;
+  try{ if(caps.focusMode?.includes?.("continuous")) await track.applyConstraints({advanced:[{focusMode:"continuous"}]}); }catch(e){}
+  if(!detector && "BarcodeDetector" in window){
+    try{ const fmts=await BarcodeDetector.getSupportedFormats(); const want=["ean_13","ean_8","upc_a","upc_e","code_128","itf"].filter(f=>fmts.includes(f)); if(want.length) detector=new BarcodeDetector({formats:want}); }catch(e){}
+  }
+  if(!detector && !zx && window.ZXing){
+    const hints=new Map(); hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.ITF]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER,true); zx=new ZXing.MultiFormatReader(); zx.setHints(hints);
+  }
+  $("#scHint").textContent="Aponte para o código de barras";
+  try{ await navigator.wakeLock?.request?.("screen"); }catch(e){}
+  loop();
+}
+const cv=document.createElement("canvas"); const cx=cv.getContext("2d",{willReadFrequently:true});
+async function lerFrame(){
+  if(!video.videoWidth) return null;
+  const vw=video.videoWidth, vh=video.videoHeight;
+  // crop central band where the frame is drawn
+  const w=Math.round(vw*0.9), h=Math.round(vh*0.45), x=Math.round((vw-w)/2), y=Math.round((vh-h)/2);
+  cv.width=w; cv.height=h; cx.drawImage(video,x,y,w,h,0,0,w,h);
+  if(detector){ try{ const r=await detector.detect(cv); if(r[0]) return r[0].rawValue; }catch(e){} return null; }
+  if(zx){ try{ const lum=new ZXing.HTMLCanvasElementLuminanceSource(cv); const bmp=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum)); const r=zx.decode(bmp); return r?.getText()||null; }catch(e){ return null; } }
+  return null;
+}
+async function loop(){
+  if(!scannerAberto) return;
+  if(!pausado){
+    const cod=await lerFrame();
+    if(cod && eanValido(cod)){
+      const now=Date.now();
+      // zxing: need two equal reads to avoid misreads
+      if(!detector){ leituras[cod]=(leituras[cod]||0)+1; if(leituras[cod]<2){ loopT=setTimeout(loop,60); return; } }
+      leituras={};
+      if(!(cod===ultimoCod && now-ultimoT<2500)){
+        ultimoCod=cod; ultimoT=now; aoLer(cod);
+      }
+    }
+  }
+  loopT=setTimeout(loop, detector?120:180);
+}
+function bip(){
+  try{ navigator.vibrate?.(60); }catch(e){}
+  try{ const a=bip.ctx||(bip.ctx=new (window.AudioContext||window.webkitAudioContext)()); const o=a.createOscillator(), g=a.createGain(); o.frequency.value=1850; g.gain.value=.08; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+.09); }catch(e){}
+}
+function aoLer(cod){
+  bip(); const fr=$("#scFrame"); fr.classList.add("hit"); setTimeout(()=>fr.classList.remove("hit"),400);
+  const r=itemPorCodigo(cod);
+  if(r) mostrarUltimo(r.nome, r.qtd, r.preco);
+}
+function mostrarUltimo(nome,qtd,preco){ $("#scLast").innerHTML=`<b>+1</b> ${esc(nome)} · ${brl(preco)}${qtd>1?` · agora ${qtd} un`:""}`; atualizarScTotal(); }
+function atualizarScTotal(){ const c=atual(); $("#scTotal").textContent=c?brl(totalDe(c))+" · "+(c.itens||[]).length+" itens":""; }
+function pausarLeitura(p){ pausado=p; if(!p){ ultimoT=Date.now(); atualizarScTotal(); } }
+function fecharScanner(){
+  scannerAberto=false; clearTimeout(loopT);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  video.srcObject=null; $("#scanner").hidden=true; render();
+}
+$("#scFechar").onclick=fecharScanner;
+$("#scDigitar").onclick=()=>{ pausarLeitura(true); aoFecharSheet=()=>pausarLeitura(false); sheetCodigo(); aoFecharSheet=()=>pausarLeitura(false); };
+$("#scSemCod").onclick=()=>sheetItem({codigo:""});
+let luz=false;
+$("#scLuz").onclick=async()=>{ try{ luz=!luz; await stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:luz}]}); }catch(e){ toast("Lanterna indisponível"); } };
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && scannerAberto) fecharScanner(); });
+
+/* ---------- tabs ---------- */
+function trocaTab(t){
+  if(scannerAberto) fecharScanner();
+  $("#tabCompra").hidden=t!=="compra"; $("#tabHist").hidden=t!=="hist";
+  $("#tbCompra").setAttribute("aria-selected",t==="compra"); $("#tbHist").setAttribute("aria-selected",t==="hist");
+  window.scrollTo(0,0);
+}
+$("#tbCompra").onclick=()=>trocaTab("compra");
+$("#tbHist").onclick=()=>trocaTab("hist");
+render();
+})();
+</script>
+</body>
+</html>
