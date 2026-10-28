@@ -15,7 +15,7 @@
 :root{
   --bg:#eef0ea; --paper:#fbfcf8; --ink:#1d2420; --muted:#5f6b63; --line:#d5dbd2;
   --accent:#0f6b55; --accent-ink:#ffffff; --accent-soft:#d9ece5;
-  --ok:#1f7a3f; --ok-soft:#dcefe2; --warn:#a4600a; --warn-soft:#f7e8cf; --bad:#b3261e; --bad-soft:#f6dcd9;
+  --ok:#1f7a3f; --ok-soft:#dcefe2; --ela:#8a3576; --ela-soft:#f3dfee; --div:#8a5a00; --div-soft:#f6e9cc; --warn:#a4600a; --warn-soft:#f7e8cf; --bad:#b3261e; --bad-soft:#f6dcd9;
   --shadow:0 10px 30px rgba(20,40,30,.14);
   --f-display:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;
   --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -25,7 +25,7 @@
 @media (prefers-color-scheme:dark){:root{
   --bg:#121614; --paper:#1b211e; --ink:#e7ece8; --muted:#9aa69f; --line:#2d3631;
   --accent:#48c29d; --accent-ink:#06261d; --accent-soft:#183a30;
-  --ok:#6ad08e; --ok-soft:#173523; --warn:#f0b257; --warn-soft:#3a2b14; --bad:#f08a80; --bad-soft:#3d1c19;
+  --ok:#6ad08e; --ok-soft:#173523; --ela:#e59ad3; --ela-soft:#3a1b33; --div:#f0c15a; --div-soft:#3a2d10; --warn:#f0b257; --warn-soft:#3a2b14; --bad:#f08a80; --bad-soft:#3d1c19;
   --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{min-height:100%;margin:0}
@@ -108,6 +108,21 @@ nav.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--
 .msg.bad{background:var(--bad-soft);color:var(--bad)}
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:999px;font-weight:600;z-index:60;max-width:90vw;text-align:center}
 .filebtn{position:relative;overflow:hidden}
+.dono{padding:2px 9px!important;border-radius:999px!important;font:700 11px var(--f-body)!important;letter-spacing:.03em;text-transform:uppercase;border:1px solid transparent!important}
+.dono.d-eu{background:var(--accent-soft)!important;color:var(--accent)!important}
+.dono.d-ela{background:var(--ela-soft)!important;color:var(--ela)!important}
+.dono.d-div{background:var(--div-soft)!important;color:var(--div)!important}
+.seg.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.seg button.d-eu[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button.d-ela[aria-pressed="true"]{background:var(--ela);color:var(--paper);border-color:transparent}
+.seg button.d-div[aria-pressed="true"]{background:var(--div);color:var(--paper);border-color:transparent}
+.split{display:flex;flex-direction:column;gap:4px;padding-top:8px;font-size:13px}
+.split div{display:flex;justify-content:space-between;gap:10px}
+.saldo{border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px;background:var(--div-soft);color:var(--div)}
+.saldo.zero{background:var(--ok-soft);color:var(--ok)}
+.saldo .v{font:700 24px var(--f-num)}
+.scanner .seg button{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3);padding:8px 4px;font-size:13px}
+.scanner .seg button[aria-pressed="true"]{background:#fff;color:#000}
 .filebtn input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px;z-index:2}
 
 /* live scanner */
@@ -150,6 +165,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--
   <div class="hint" id="scHint">Aponte para o código de barras</div>
   <div class="foot">
     <div class="last" id="scLast"></div>
+    <div id="scDonoBox"></div>
     <div class="row"><button id="scDigitar">Digitar código</button><button id="scSemCod">Item sem código</button></div>
   </div>
 </div>
@@ -188,6 +204,26 @@ function totalDe(c){ return round2((c.itens||[]).reduce((s,i)=>s+parseNum(i.qtd)
 function atual(){ return estado.compras.find(c=>c.id===atualId) || null; }
 function fmtQtd(i){ return i.unidade==="kg" ? parseNum(i.qtd).toLocaleString("pt-BR",{maximumFractionDigits:3})+" kg" : parseNum(i.qtd)+" un"; }
 function salvar(){ gravar(); render(); }
+if(!estado.nomes) estado.nomes={eu:"Carlos", ela:"Esposa"};
+function nomeDono(d){ return d==="ela"?(estado.nomes.ela||"Esposa"):d==="div"?"Dividido":(estado.nomes.eu||"Eu"); }
+function subt(i){ return parseNum(i.qtd)*parseNum(i.preco); }
+function partes(c){
+  let eu=0,ela=0,div=0;
+  (c.itens||[]).forEach(i=>{ const v=subt(i); if(i.de==="ela") ela+=v; else if(i.de==="div") div+=v; else eu+=v; });
+  return {eu:round2(eu), ela:round2(ela), div:round2(div), parteEu:round2(eu+div/2), parteEla:round2(ela+div/2)};
+}
+/* positivo: ela deve para mim · negativo: eu devo para ela */
+function saldoDe(c){
+  const t=totalDe(c), q=c.pagamento?.quem||"eu", p=partes(c);
+  const pagoEu = q==="eu"?t : q==="ela"?0 : round2(t/2);
+  return round2(pagoEu-p.parteEu);
+}
+function textoSaldo(v){
+  if(Math.abs(v)<0.01) return "Contas acertadas";
+  return v>0 ? `${estado.nomes.ela} deve ${brl(v)} para ${estado.nomes.eu}` : `${estado.nomes.eu} deve ${brl(-v)} para ${estado.nomes.ela}`;
+}
+function segDono(id, atualDe){ return `<div class="seg three" role="group" aria-label="De quem é" id="${id}">${["eu","ela","div"].map(d=>`<button class="d-${d}" data-de="${d}" aria-pressed="${d===atualDe}">${d==="div"?"Dividido":esc(nomeDono(d))}</button>`).join("")}</div>`; }
+function ligaSegDono(id, fn){ document.querySelectorAll("#"+id+" [data-de]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("#"+id+" [data-de]").forEach(x=>x.setAttribute("aria-pressed",x===b)); fn(b.dataset.de); }); }
 
 /* ---------- render ---------- */
 function render(){ renderCompra(); renderHist(); renderTop(); }
@@ -224,20 +260,24 @@ function renderCompra(){
       <button id="btnDigitar">Digitar código</button>
       <button id="btnSemCod">Item sem código</button>
     </div>
+    <div class="field"><div class="label">Próximos itens vão para</div>${segDono("segPadrao", c.padrao||"eu")}</div>
     <div class="receipt">
       <div class="hd"><b>${esc(c.mercado).toUpperCase()}</b><div class="d" style="color:var(--muted)">${fmtData(c.data)} · ${itens.length} ${itens.length===1?"item":"itens"}</div></div>
       ${itens.length? itens.map((i,k)=>`
         <div class="it">
           <div class="n">${esc(i.nome)}</div>
           <div class="s">${brl(parseNum(i.qtd)*parseNum(i.preco))}</div>
-          <div class="d">${i.codigo?esc(i.codigo)+" · ":""}${fmtQtd(i)} × ${brl(i.preco)}</div>
+          <div class="d"><button class="dono d-${i.de||"eu"}" data-dono="${k}" aria-label="Trocar de quem é">${esc(nomeDono(i.de||"eu"))}</button> ${i.codigo?esc(i.codigo)+" · ":""}${fmtQtd(i)} × ${brl(i.preco)}</div>
           <div class="q"><button data-menos="${k}" aria-label="Diminuir">−</button><button data-mais="${k}" aria-label="Aumentar">+</button><button data-edit="${k}" aria-label="Editar">✎</button></div>
         </div>`).join("") : `<div class="empty">Nenhum produto ainda. Toque em <b>Escanear produtos</b> e passe a câmera no código de barras.</div>`}
       <div class="tot"><span>TOTAL</span><span class="num">${brl(totalDe(c))}</span></div>
+      ${htmlSplit(c)}
     </div>
     <button class="primary" id="btnFinal" style="padding:16px;font-size:16px" ${itens.length?"":"disabled"}>Finalizar e pagar</button>
     <div class="row"><button class="ghost" id="btnEditCab">Mudar mercado ou data</button><button class="ghost" id="btnCancelar" style="color:var(--bad)!important">Descartar compra</button></div>`;
   $("#btnScan").onclick=abrirScanner;
+  ligaSegDono("segPadrao", d=>{ c.padrao=d; gravar(); });
+  el.querySelectorAll("[data-dono]").forEach(b=>b.onclick=()=>{ const i=c.itens[+b.dataset.dono]; const ord=["eu","ela","div"]; i.de=ord[(ord.indexOf(i.de||"eu")+1)%3]; salvar(); });
   $("#btnDigitar").onclick=()=>sheetCodigo();
   $("#btnSemCod").onclick=()=>sheetItem({codigo:""});
   el.querySelectorAll("[data-mais]").forEach(b=>b.onclick=()=>mudaQtd(+b.dataset.mais, 1));
@@ -246,6 +286,16 @@ function renderCompra(){
   $("#btnFinal").onclick=()=>sheetPagamento(c);
   $("#btnEditCab").onclick=()=>sheetCabecalho(c);
   $("#btnCancelar").onclick=()=>confirmar("Descartar esta compra?","Os itens registrados serão apagados.","Descartar",()=>{ estado.compras=estado.compras.filter(x=>x.id!==c.id); atualId=null; salvar(); });
+}
+function htmlSplit(c){
+  const p=partes(c); if(!(c.itens||[]).length) return "";
+  if(!p.ela && !p.div) return `<div class="split"><div><span>Tudo de ${esc(estado.nomes.eu)}</span><span>${brl(p.eu)}</span></div></div>`;
+  return `<div class="split">
+    ${p.eu?`<div><span>Só ${esc(estado.nomes.eu)}</span><span>${brl(p.eu)}</span></div>`:""}
+    ${p.ela?`<div><span>Só ${esc(estado.nomes.ela)}</span><span>${brl(p.ela)}</span></div>`:""}
+    ${p.div?`<div><span>Dividido (metade cada)</span><span>${brl(p.div)}</span></div>`:""}
+    <div style="font-weight:700;border-top:1px dashed var(--line);padding-top:6px"><span>Parte de ${esc(estado.nomes.eu)}</span><span>${brl(p.parteEu)}</span></div>
+    <div style="font-weight:700"><span>Parte de ${esc(estado.nomes.ela)}</span><span>${brl(p.parteEla)}</span></div></div>`;
 }
 function mudaQtd(k, d){
   const c=atual(); const i=c.itens[k]; if(!i) return;
@@ -263,8 +313,13 @@ function renderHist(){
   const lista = filtroMes==="tudo" ? fin : fin.filter(c=>(c.data||"").startsWith(filtroMes||""));
   const tot = round2(lista.reduce((s,c)=>s+totalDe(c),0));
   const por = {}; lista.forEach(c=>{ const f=c.pagamento?.forma||"outro"; por[f]=round2((por[f]||0)+totalDe(c)); });
+  const pEu=round2(lista.reduce((s,c)=>s+partes(c).parteEu,0)), pEla=round2(lista.reduce((s,c)=>s+partes(c).parteEla,0));
+  const pend=fin.filter(c=>!c.acertado && Math.abs(saldoDe(c))>=0.01); const saldoPend=round2(pend.reduce((s,c)=>s+saldoDe(c),0));
   const nomeMes = m => { if(m==="tudo") return "Tudo"; const [y,mm]=m.split("-"); return MESES[+mm-1]+"/"+y.slice(2); };
-  const backup = `<div class="card"><h3 style="font-size:17px">Backup</h3>
+  const nomes = `<div class="card"><h3 style="font-size:17px">Nomes</h3>
+      <div class="row"><div class="field"><label class="label" for="nmEu">Você</label><input id="nmEu" value="${esc(estado.nomes.eu)}"></div>
+      <div class="field"><label class="label" for="nmEla">Sua esposa</label><input id="nmEla" value="${esc(estado.nomes.ela)}"></div></div></div>`;
+  const backup = nomes + `<div class="card"><h3 style="font-size:17px">Backup</h3>
       <p class="note" style="margin:0">As compras ficam guardadas neste celular, neste navegador. Se limpar os dados do Chrome, elas somem. Salve um backup de vez em quando.</p>
       <div class="row"><button id="bkSalvar">Salvar backup</button><label class="btn filebtn">Restaurar backup<input type="file" id="bkIn" accept="application/json,.json"></label></div></div>`;
   el.innerHTML = (!fin.length ? `
@@ -272,17 +327,28 @@ function renderHist(){
     <div class="chips">${[...meses,"tudo"].map(m=>`<button class="chip" data-mes="${m}" aria-pressed="${m===filtroMes}">${nomeMes(m)}</button>`).join("")}</div>
     <div class="stats">
       <div class="stat main"><div class="label">Total gasto · ${lista.length} ${lista.length===1?"compra":"compras"}</div><div class="v">${brl(tot)}</div></div>
+      <div class="stat"><div class="label">Gastos de ${esc(estado.nomes.eu)}</div><div class="v" style="color:var(--accent)">${brl(pEu)}</div></div>
+      <div class="stat"><div class="label">Gastos de ${esc(estado.nomes.ela)}</div><div class="v" style="color:var(--ela)">${brl(pEla)}</div></div>
       ${["dinheiro","debito","credito","pix"].filter(f=>por[f]).map(f=>`<div class="stat"><div class="label">${PAG[f]}</div><div class="v">${brl(por[f])}</div></div>`).join("")}
+    </div>
+    <div class="saldo ${pend.length?"":"zero"}">
+      <div class="label" style="color:inherit">Acerto de contas${pend.length?` · ${pend.length} ${pend.length===1?"compra pendente":"compras pendentes"}`:""}</div>
+      <div class="v">${pend.length?brl(Math.abs(saldoPend)):"R$ 0,00"}</div>
+      <div style="font-weight:600">${pend.length?esc(textoSaldo(saldoPend)):"Nada a acertar entre vocês."}</div>
+      ${pend.length?`<button id="btnAcertar" style="margin-top:4px">Marcar como acertado</button>`:""}
     </div>
     <div class="hist">${lista.map(c=>{ const [y,m,d]=(c.data||"----").split("-"); const cf=c.conferencia;
       return `<button class="hrow" data-ver="${c.id}">
         <div class="dt">${d||"--"}<small>${m?MESES[+m-1]:""}</small></div>
-        <div class="mid"><b>${esc(c.mercado)}</b><span>${PAG[c.pagamento?.forma]||"—"} · ${(c.itens||[]).length} itens</span>
+        <div class="mid"><b>${esc(c.mercado)}</b><span>${PAG[c.pagamento?.forma]||"—"} · ${(c.itens||[]).length} itens${(()=>{const sd=saldoDe(c); return !c.acertado&&Math.abs(sd)>=0.01?` · <span style="color:var(--div)">${sd>0?esc(estado.nomes.ela)+" deve "+brl(sd):"você deve "+brl(-sd)}</span>`:"";})()}</span>
           <div style="margin-top:4px">${cf?(cf.bateu?'<span class="pill ok">Nota confere</span>':'<span class="pill bad">Divergência</span>'):'<span class="pill mute">Sem conferência</span>'}</div></div>
         <div class="v">${brl(totalDe(c))}</div></button>`; }).join("")}</div>`) + backup;
   el.querySelectorAll("[data-mes]").forEach(b=>b.onclick=()=>{ filtroMes=b.dataset.mes; renderHist(); });
   el.querySelectorAll("[data-ver]").forEach(b=>b.onclick=()=>sheetDetalhe(estado.compras.find(c=>c.id===b.dataset.ver)));
   $("#bkSalvar").onclick=salvarBackup;
+  const salvaNome=()=>{ estado.nomes={eu:$("#nmEu").value.trim()||"Eu", ela:$("#nmEla").value.trim()||"Esposa"}; salvar(); };
+  $("#nmEu").onchange=salvaNome; $("#nmEla").onchange=salvaNome;
+  if($("#btnAcertar")) $("#btnAcertar").onclick=()=>confirmar("Marcar como acertado?", textoSaldo(saldoPend)+". As compras pendentes ficam como pagas entre vocês.", "Marcar acertado", ()=>{ const t=Date.now(); pend.forEach(c=>c.acertado=t); salvar(); toast("Contas acertadas"); });
   $("#bkIn").onchange=e=>restaurarBackup(e.target.files?.[0]);
 }
 
@@ -299,7 +365,7 @@ async function restaurarBackup(file){
     const d=JSON.parse(await file.text()); if(!Array.isArray(d.compras)) throw 0;
     confirmar("Restaurar este backup?","Compras com o mesmo registro serão substituídas pelas do backup.","Restaurar",()=>{
       const map=new Map(estado.compras.map(c=>[c.id,c])); d.compras.forEach(c=>map.set(c.id,c));
-      estado.compras=[...map.values()]; estado.catalogo={...estado.catalogo,...(d.catalogo||{})}; salvar(); toast("Backup restaurado");
+      estado.compras=[...map.values()]; estado.catalogo={...estado.catalogo,...(d.catalogo||{})}; if(d.nomes) estado.nomes=d.nomes; salvar(); toast("Backup restaurado");
     });
   }catch(e){ toast("Esse arquivo não é um backup da Caderneta."); }
 }
@@ -348,7 +414,7 @@ function itemPorCodigo(codigo){
   if (k>=0 && c.itens[k].unidade!=="kg"){ c.itens[k].qtd=parseNum(c.itens[k].qtd)+1; salvar(); return {nome:c.itens[k].nome, qtd:c.itens[k].qtd, preco:c.itens[k].preco}; }
   const cat=estado.catalogo[codigo];
   if (cat && cat.unidade!=="kg" && k<0 && cat.nome && cat.preco>0 && scannerAberto){
-    c.itens.push({codigo, nome:cat.nome, preco:cat.preco, qtd:1, unidade:"un"}); salvar();
+    c.itens.push({codigo, nome:cat.nome, preco:cat.preco, qtd:1, unidade:"un", de:c.padrao||"eu"}); salvar();
     return {nome:cat.nome, qtd:1, preco:cat.preco, conhecido:true};
   }
   sheetItem({codigo, nome:cat?.nome||"", preco:cat?.preco??"", unidade:cat?.unidade||"un", qtd:1}, -1, !cat);
@@ -365,10 +431,11 @@ function sheetItem(item, idx=-1, novo=false){
       <div class="field"><label class="label" for="itPreco" id="lbPreco">${un==="kg"?"Preço do kg":"Preço unitário"}</label><input id="itPreco" inputmode="decimal" value="${item.preco!==""&&item.preco!=null?String(item.preco).replace(".",","):""}" placeholder="0,00"></div>
       <div class="field"><label class="label" for="itQtd" id="lbQtd">${un==="kg"?"Peso (kg)":"Quantidade"}</label><input id="itQtd" inputmode="decimal" value="${String(item.qtd??1).replace(".",",")}"></div>
     </div>
+    <div class="field"><div class="label">De quem é</div>${segDono("segItem", item.de||atual()?.padrao||"eu")}</div>
     <div class="note" id="itSub"></div>
     <button class="primary" id="itOk" style="padding:14px">${editando?"Salvar":"Adicionar à compra"}</button>
     ${editando?`<button class="danger" id="itDel">Remover item</button>`:""}`, ()=>{
-      let unidade=un;
+      let unidade=un; let de=item.de||atual()?.padrao||"eu"; ligaSegDono("segItem", d=>{ de=d; });
       const sub=()=>{ $("#itSub").textContent="Subtotal: "+brl(parseNum($("#itPreco").value)*parseNum($("#itQtd").value)); };
       $("#itPreco").oninput=sub; $("#itQtd").oninput=sub; sub();
       document.querySelectorAll("[data-un]").forEach(b=>b.onclick=()=>{ unidade=b.dataset.un;
@@ -380,7 +447,7 @@ function sheetItem(item, idx=-1, novo=false){
         if(!nome){ toast("Dê um nome ao produto."); return; }
         if(!(preco>0)){ toast("Informe o preço."); return; }
         if(!(qtd>0)){ toast("Informe a quantidade."); return; }
-        const c=atual(); const ni={codigo:item.codigo||"", nome, preco, qtd, unidade};
+        const c=atual(); const ni={codigo:item.codigo||"", nome, preco, qtd, unidade, de};
         if (editando) c.itens[idx]=ni; else c.itens.push(ni);
         if (ni.codigo) estado.catalogo[ni.codigo]={nome,preco,unidade};
         salvar(); closeSheet(); if(!editando){ toast(nome+" adicionado"); if(scannerAberto) mostrarUltimo(nome, qtd, preco); }
@@ -391,13 +458,19 @@ function sheetItem(item, idx=-1, novo=false){
 }
 
 function sheetPagamento(c){
-  const total=totalDe(c); let forma=c.pagamento?.forma||"dinheiro";
+  const total=totalDe(c); let forma=c.pagamento?.forma||"dinheiro"; let quem=c.pagamento?.quem||"eu"; const pt=partes(c);
   openSheet(`${shHead("Pagamento")}
     <div style="text-align:center"><div class="label">Total registrado</div><div class="num" style="font-size:34px;font-weight:700">${brl(total)}</div></div>
     <div class="seg" role="group" aria-label="Forma de pagamento">${Object.entries(PAG).map(([k,v])=>`<button data-fp="${k}" aria-pressed="${k===forma}">${v.replace("Cartão ","")}</button>`).join("")}</div>
     <div class="field" id="boxPago"><label class="label" for="pgValor">Valor entregue</label><input id="pgValor" inputmode="decimal" placeholder="${brl(total)}"><div class="note" id="pgTroco"></div></div>
     <div class="field" id="boxParc" hidden><label class="label" for="pgParc">Parcelas</label><input id="pgParc" inputmode="numeric" value="1"></div>
+    <div class="field"><div class="label">Quem pagou</div>
+      <div class="seg three" id="segQuem"><button class="d-eu" data-q="eu" aria-pressed="${quem==="eu"}">${esc(estado.nomes.eu)}</button><button class="d-ela" data-q="ela" aria-pressed="${quem==="ela"}">${esc(estado.nomes.ela)}</button><button class="d-div" data-q="metade" aria-pressed="${quem==="metade"}">Metade cada</button></div></div>
+    <div class="note" id="pgSaldo"></div>
     <button class="primary" id="pgOk" style="padding:14px">Finalizar compra</button>`, ()=>{
+      const updQ=()=>{ document.querySelectorAll("#segQuem [data-q]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.q===quem));
+        const sim={...c, pagamento:{quem}}; $("#pgSaldo").innerHTML=`Parte de ${esc(estado.nomes.eu)}: <b>${brl(pt.parteEu)}</b> · parte de ${esc(estado.nomes.ela)}: <b>${brl(pt.parteEla)}</b><br><b>${esc(textoSaldo(saldoDe(sim)))}</b>`; };
+      document.querySelectorAll("#segQuem [data-q]").forEach(b=>b.onclick=()=>{ quem=b.dataset.q; updQ(); }); updQ();
       const upd=()=>{ $("#boxPago").hidden=forma!=="dinheiro"; $("#boxParc").hidden=forma!=="credito";
         document.querySelectorAll("[data-fp]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.fp===forma));
         const v=parseNum($("#pgValor").value); $("#pgTroco").textContent = v? (v>=total? "Troco: "+brl(v-total) : "Faltam "+brl(total-v)) : ""; };
@@ -405,7 +478,7 @@ function sheetPagamento(c){
       $("#pgValor").oninput=upd; upd();
       $("#pgOk").onclick=()=>{
         const pago=parseNum($("#pgValor").value);
-        c.pagamento={forma, total, ...(forma==="dinheiro"&&pago?{entregue:round2(pago),troco:round2(Math.max(0,pago-total))}:{}), ...(forma==="credito"?{parcelas:Math.max(1,parseInt($("#pgParc").value)||1)}:{})};
+        c.pagamento={forma, quem, total, ...(forma==="dinheiro"&&pago?{entregue:round2(pago),troco:round2(Math.max(0,pago-total))}:{}), ...(forma==="credito"?{parcelas:Math.max(1,parseInt($("#pgParc").value)||1)}:{})};
         c.status="finalizada"; c.finalizado=Date.now(); atualId=null; salvar();
         aoFecharSheet=null; $("#sheetRoot").innerHTML=""; sheetDetalhe(c, true);
       };
@@ -436,6 +509,10 @@ function sheetDetalhe(c, recem=false){
       <div style="text-align:right"><div class="label">Total</div><div class="num" style="font-weight:700;font-size:18px">${brl(totalDe(c))}</div></div>
     </div>
     ${p.entregue?`<div class="note">Entregue ${brl(p.entregue)} · troco ${brl(p.troco)}</div>`:""}
+    ${(()=>{ const pt=partes(c), sd=saldoDe(c); return `<div class="saldo ${Math.abs(sd)<0.01||c.acertado?"zero":""}">
+      <div class="label" style="color:inherit">Divisão · pagou ${p.quem==="ela"?esc(estado.nomes.ela):p.quem==="metade"?"metade cada":esc(estado.nomes.eu)}</div>
+      <div>${esc(estado.nomes.eu)}: <b class="num">${brl(pt.parteEu)}</b> · ${esc(estado.nomes.ela)}: <b class="num">${brl(pt.parteEla)}</b></div>
+      <div style="font-weight:700">${c.acertado&&Math.abs(sd)>=0.01?"Acertado: "+esc(textoSaldo(sd)).toLowerCase():esc(textoSaldo(sd))}</div></div>`; })()}
     <div class="card" style="gap:10px">
       <h3 style="font-size:17px">Conferir a notinha</h3>
       <p class="note" style="margin:0">Fotografe a notinha. O celular abre o menu de compartilhar: escolha o <b>Claude</b> e envie. A foto vai junto com a lista desta compra e o Claude diz se bateu.</p>
@@ -446,8 +523,8 @@ function sheetDetalhe(c, recem=false){
       <input id="cfObs" placeholder="Anotação (ex.: cobraram 2 leites)" value="${esc(cf?.obs||"")}">
     </div>
     <details><summary class="label" style="cursor:pointer">Itens registrados (${(c.itens||[]).length})</summary>
-      <div class="receipt" style="margin-top:10px">${(c.itens||[]).map(i=>`<div class="it"><div class="n">${esc(i.nome)}</div><div class="s">${brl(parseNum(i.qtd)*parseNum(i.preco))}</div><div class="d" style="grid-column:1/-1">${i.codigo?esc(i.codigo)+" · ":""}${fmtQtd(i)} × ${brl(i.preco)}</div></div>`).join("")}
-      <div class="tot"><span>TOTAL</span><span>${brl(totalDe(c))}</span></div></div></details>
+      <div class="receipt" style="margin-top:10px">${(c.itens||[]).map(i=>`<div class="it"><div class="n">${esc(i.nome)}</div><div class="s">${brl(parseNum(i.qtd)*parseNum(i.preco))}</div><div class="d" style="grid-column:1/-1"><span class="dono d-${i.de||"eu"}" style="display:inline-block">${esc(nomeDono(i.de||"eu"))}</span> ${i.codigo?esc(i.codigo)+" · ":""}${fmtQtd(i)} × ${brl(i.preco)}</div></div>`).join("")}
+      <div class="tot"><span>TOTAL</span><span>${brl(totalDe(c))}</span></div>${htmlSplit(c)}</div></details>
     <div class="row"><button id="btnReabrir">Reabrir para editar</button><button class="danger" id="btnExcluir">Excluir</button></div>`, ()=>{
       const marcar=(bateu)=>{ c.conferencia={bateu, obs:$("#cfObs").value.trim(), quando:Date.now()}; gravar(); render();
         document.querySelectorAll("[data-cf]").forEach(b=>b.setAttribute("aria-pressed",(b.dataset.cf==="ok")===bateu)); toast(bateu?"Marcada como conferida":"Divergência anotada"); };
@@ -464,7 +541,7 @@ function sheetDetalhe(c, recem=false){
         await copiar(texto); toast("Lista copiada. Abra o Claude, cole e anexe a foto.");
       };
       $("#btnCopiar").onclick=async()=>{ await copiar(textoConferencia(c)); toast("Lista copiada"); };
-      $("#btnReabrir").onclick=()=>{ if(atual()&&atual().id!==c.id){ toast("Finalize a compra aberta primeiro."); return; } c.status="aberta"; atualId=c.id; salvar(); closeSheet(); trocaTab("compra"); };
+      $("#btnReabrir").onclick=()=>{ if(atual()&&atual().id!==c.id){ toast("Finalize a compra aberta primeiro."); return; } c.status="aberta"; delete c.acertado; atualId=c.id; salvar(); closeSheet(); trocaTab("compra"); };
       $("#btnExcluir").onclick=()=>confirmar("Excluir esta compra?","Ela sai do histórico e dos totais.","Excluir",()=>{ estado.compras=estado.compras.filter(x=>x.id!==c.id); salvar(); });
   });
 }
@@ -490,7 +567,7 @@ function eanValido(c){
 async function abrirScanner(){
   if(!atual()){ toast("Comece uma compra primeiro."); return; }
   if(!navigator.mediaDevices?.getUserMedia){ toast("Este navegador não libera a câmera. Use o Chrome."); return; }
-  $("#scanner").hidden=false; scannerAberto=true; pausado=false; $("#scLast").textContent=""; atualizarScTotal();
+  $("#scanner").hidden=false; scannerAberto=true; { const c0=atual(); $("#scDonoBox").innerHTML=segDono("scDono", c0.padrao||"eu"); ligaSegDono("scDono", d=>{ c0.padrao=d; gravar(); }); } pausado=false; $("#scLast").textContent=""; atualizarScTotal();
   $("#scHint").textContent="Abrindo a câmera…";
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
@@ -550,7 +627,7 @@ function aoLer(cod){
   const r=itemPorCodigo(cod);
   if(r) mostrarUltimo(r.nome, r.qtd, r.preco);
 }
-function mostrarUltimo(nome,qtd,preco){ $("#scLast").innerHTML=`<b>+1</b> ${esc(nome)} · ${brl(preco)}${qtd>1?` · agora ${qtd} un`:""}`; atualizarScTotal(); }
+function mostrarUltimo(nome,qtd,preco){ $("#scLast").innerHTML=`<b>+1</b> ${esc(nome)} · ${esc(nomeDono(atual()?.padrao||"eu"))} · ${brl(preco)}${qtd>1?` · agora ${qtd} un`:""}`; atualizarScTotal(); }
 function atualizarScTotal(){ const c=atual(); $("#scTotal").textContent=c?brl(totalDe(c))+" · "+(c.itens||[]).length+" itens":""; }
 function pausarLeitura(p){ pausado=p; if(!p){ ultimoT=Date.now(); atualizarScTotal(); } }
 function fecharScanner(){
